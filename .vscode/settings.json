@@ -1,0 +1,13 @@
+{
+  "editor.tabSize": 2,
+  "editor.detectIndentation": false,
+  "editor.fontFamily": "'Dank Mono', Consolas, 'Courier New', monospace",
+  "python.linting.pylintEnabled": true,
+  "python.linting.enabled": true,
+  "python.linting.pycodestyleEnabled": true,
+  "python.analysis.extraPaths": [
+    "./createVegetationPolygon",
+    "./src/veg_poly",
+    "./python"
+  ]
+}
