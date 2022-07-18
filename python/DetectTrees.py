@@ -234,7 +234,9 @@ class DetectTrees(object):
     EXTENT_SHAPE = params.get('EXTENT_SHAPE')
     CLIPPED_ORTHO_RASTER = params.get('CLIPPED_ORTHO_RASTER', f'{TEMP_PATH}/ortho.tif')
     BUFFER_SIZE = params.get('BUFFER_SIZE')
+    arcpy.AddMessage('Clipping orthophoto raster to extent...')
     arcpy.management.Clip(ORTHO_RASTER, None, CLIPPED_ORTHO_RASTER, EXTENT_SHAPE, '256', 'ClippingGeometry', 'MAINTAIN_EXTENT') # clip to input extent to reduce processing time
+    arcpy.AddMessage('Generating vegetation raster...')
     veg_poly.create(CLIPPED_ORTHO_RASTER, VEG_POLY, VEG_POLY_BUFFERED, BUFFER_SIZE)
 
     # clip the input LAS dataset to the provided extent
@@ -242,7 +244,9 @@ class DetectTrees(object):
     LAS_DATASET = params.get('LAS_DATASET')
     LAS_TILED_DATSET = f'{TILED_LAS_FOLDER}/tiles.lasd'
     LAS_CLIPPED_DATSET = f'{TEMP_PATH}/clipped_las/tiles.lasd'
+    arcpy.AddMessage('Clapping LAS dataset to extent...')
     arcpy.ddd.ExtractLas(LAS_DATASET, CLIPPED_LAS_FOLDER, 'MAXOF', EXTENT_SHAPE, 'PROCESS_EXTENT', '', 'MAINTAIN_VLR', 'REARRANGE_POINTS', 'NO_COMPUTE_STATS', LAS_CLIPPED_DATSET, 'NO_COMPRESSION')
+    arcpy.AddMessage('Tiling clipped LAS dataset...')
     arcpy.ddd.TileLas(LAS_CLIPPED_DATSET, TILED_LAS_FOLDER, 'tile', LAS_TILED_DATSET, 'COMPUTE_STATS', '1.4', None, 'NO_COMPRESSION', 'REARRANGE_POINTS', None, 'ROW_COLUMN', None, '1 kilometer', '1 kilometer', None)
 
     # loop through the clipped las tiles to generate a list of las files to process
@@ -257,32 +261,40 @@ class DetectTrees(object):
     BUILDING_ELEV_ADD = 5
     FILTERED_LAS_DATASET = params.get('FILTERED_LAS_DATASET', f'{FILTERED_LAS_FOLDER}/tiles.lasd')
     
-    for las in las_file_names:
+    for index, las in enumerate(las_file_names):
+      arcpy.AddMessage(f'Filtering {las} ({index + 1}/{len(las_file_names)})...')
       input_las = f'{TILED_LAS_FOLDER}/{las}'
 
       # create polygon boundary for each tile
       las_tile_boundary = f'{TILED_LAS_FOLDER}/{las[0:-4]}.shp'
+      arcpy.AddMessage('...generating tile boundary')
       arcpy.ddd.PointFileInformation(input_las, las_tile_boundary, 'LAS', '', BUILDINGS_CRS, 'NO_RECURSION')
       
       # clip buildings to las tile and then buffer them
       buildings_clipped = f'{CLIPPED_BUILDINGS_FOLDER}/{las[0:-4]}.shp'
+      arcpy.AddMessage('...clipping buildings to tile')
       arcpy.analysis.PairwiseClip(BUILDINGS, las_tile_boundary, buildings_clipped);
       buildings_buffered = f'{CLIPPED_BUILDINGS_FOLDER}/{las[0:-4]}_buffered.shp'
+      arcpy.AddMessage('...buffering buildings')
       arcpy.Buffer_analysis(buildings_clipped, buildings_buffered, BUFFER_SIZE, 'FULL', 'ROUND', 'NONE')
       
       # clean las tile
       output_las = f'{FILTERED_LAS_FOLDER}/{las}'
+      arcpy.AddMessage('...cleaning las tile')
       arcpy.rtools.PruneBuildingsFromLidar(input_las, buildings_buffered, output_las, BUILDING_ELEV_ATTR, BUILDING_ELEV_ADD, True, VEG_POLY_BUFFERED, True)  
     
     output_las_files = []
     for fileName in os.listdir(FILTERED_LAS_FOLDER): output_las_files.append(f'{FILTERED_LAS_FOLDER}/{fileName}')
+    arcpy.AddMessage('Creating filtered LAS dataset from filtered tiles...')
     arcpy.management.CreateLasDataset(output_las_files, FILTERED_LAS_DATASET)
 
     # convert lidar points to a digital surface model (DSM)
     DSM = f'{TEMP_PATH}/dsm.tif'
     DSM_CLIPPED = params.get('DSM', f'{TEMP_PATH}/dsm_clipped.tif')
     DSM_CELLSIZE = params.get('DSM_CELLSIZE')
+    arcpy.AddMessage('Converting filtered LAS dataset to digital surface model (DSM)...')
     arcpy.conversion.LasDatasetToRaster(FILTERED_LAS_DATASET, DSM, 'ELEVATION', 'BINNING MAXIMUM NATURAL_NEIGHBOR', 'FLOAT', 'CELLSIZE', DSM_CELLSIZE) 
+    arcpy.AddMessage('Clipping DSM to extent...')
     arcpy.management.Clip(DSM, None, DSM_CLIPPED, EXTENT_SHAPE, '256', 'ClippingGeometry', 'NO_MAINTAIN_EXTENT'); # clip to extent to save processing time
 
     # generate tree points and tree crowns
@@ -292,6 +304,7 @@ class DetectTrees(object):
     MIN_TREE_HEIGHT = params.get('MIN_TREE_HEIGHT')
     MIN_TREE_CROWN_HEIGHT = params.get('MIN_TREE_CROWN_HEIGHT')
     WINDOW_FUNCTION = params.get('WINDOW_FUNCTION')
+    arcpy.AddMessage('Detecting trees...')
     arcpy.rtools.LidarTreeCrownDelineation(DSM_CLIPPED, MIN_TREE_HEIGHT, WINDOW_FUNCTION, TREE_POINTS, MIN_TREE_CROWN_HEIGHT, TREE_CROWN_POLYGONS)
 
     return
