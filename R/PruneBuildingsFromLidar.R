@@ -136,41 +136,51 @@ clip_vegetation = function(las, vegetation_layer_folder, vegetation_layer_name) 
 
   las_crs = sf::st_crs(las)
 
-  #=======================================================================#
-  # Import and process vegetation shapefile
-  #=======================================================================#
-  cat('Loading vegetation shapefile... ')
-  veg_poly_spdf = rgdal::readOGR(vegetation_layer_folder, sub('.shp', '', vegetation_layer_name))
-  message('✔ DONE')
-  
-  cat('Transforming vegetation to sf type... ')
-  veg_poly_sf = sf::st_as_sf(veg_poly_spdf)
-  message('✔ DONE')
-  
-  cat('Converting vegetation coordinate system to match LiDAR... ')
-  veg_poly = sf::st_transform(veg_poly_sf, las_crs)
-  message('✔ DONE')
+  out = tryCatch({
+    #=======================================================================#
+    # Import and process vegetation shapefile
+    #=======================================================================#
+    cat('Loading vegetation shapefile... ')
+    veg_poly_spdf = rgdal::readOGR(vegetation_layer_folder, sub('.shp', '', vegetation_layer_name))
+    message('✔ DONE')
+    
+    cat('Transforming vegetation to sf type... ')
+    veg_poly_sf = sf::st_as_sf(veg_poly_spdf)
+    message('✔ DONE')
+    
+    cat('Converting vegetation coordinate system to match LiDAR... ')
+    veg_poly = sf::st_transform(veg_poly_sf, las_crs)
+    message('✔ DONE')
 
-  #=======================================================================#
-  # Perform spacial merge between LiDAR and vegetation
-  #=======================================================================#
-  cat('Performing spatial merge with vegetation polygons... ')
-  las_with_vegetation_markers = lidR::merge_spatial(las, veg_poly, 'veg')
-  message('✔ DONE')
+    #=======================================================================#
+    # Perform spacial merge between LiDAR and vegetation
+    #=======================================================================#
+    cat('Performing spatial merge with vegetation polygons... ')
+    las_with_vegetation_markers = lidR::merge_spatial(las, veg_poly, 'veg')
+    message('✔ DONE')
 
-  
-  #=======================================================================#
-  # Filter unvegetated regions out of the LiDAR
-  #=======================================================================#
-  cat('Removing unvegetated regions from LiDAR... ')
-  filtered_las = lidR::filter_poi(las_with_vegetation_markers, veg == TRUE)
-  message('✔ DONE')
-  
-  #=======================================================================#
-  # Return the filtered LiDAR
-  #=======================================================================#
-  message('✅ DONE')
-  return(filtered_las)
+    #=======================================================================#
+    # Filter unvegetated regions out of the LiDAR
+    #=======================================================================#
+    cat('Removing unvegetated regions from LiDAR... ')
+    filtered_las = lidR::filter_poi(las_with_vegetation_markers, veg == TRUE)
+    message('✔ DONE')
+    
+    #=======================================================================#
+    # Return the filtered LiDAR
+    #=======================================================================#
+    message('✅ DONE')
+    return(filtered_las)
+  }, error = function(error) {
+    #=======================================================================#
+    # Return the original LiDAR (something went wrong)
+    #=======================================================================#
+    message('Something went wrong. Returning the original LiDAR... ')
+    message('✅ DONE')
+    return(las)
+  })
+
+  return(out)
 }
 
 #' Remove planar points from LiDAR.
