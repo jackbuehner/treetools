@@ -62,7 +62,7 @@ tool_exec <- function(in_params, out_params) {
   treetops = ForestTools::vwf(
                 CHM = canopy_height_model_raster,
                 minHeight = input_min_tree_height,
-                minWinNeib = 'rook',
+                minWinNeib = 'queen',
                 winFun = linear_function,
                 maxWinDiameter = NULL,
                 verbose = TRUE
