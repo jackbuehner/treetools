@@ -72,47 +72,58 @@ prune_buildings_from_las = function(las_file_path, buildings_layer_folder, build
   las = lidR::readLAS(las_file_path)
   las_crs = sf::st_crs(las)
   message('✔ DONE')
+
+  out = tryCatch({
+    #=======================================================================#
+    # Import and process buildings shapefile
+    #=======================================================================#
+    cat('Loading buildings shapefile... ')
+    buildings_spdf = rgdal::readOGR(buildings_layer_folder, sub('.shp', '', buildings_layer_name))
+    message('✔ DONE')
   
-  #=======================================================================#
-  # Import and process buildings shapefile
-  #=======================================================================#
-  cat('Loading buildings shapefile... ')
-  buildings_spdf = rgdal::readOGR(buildings_layer_folder, sub('.shp', '', buildings_layer_name))
-  message('✔ DONE')
-  
-  cat('Transforming buildings to sf type... ')
-  buildings_sf = sf::st_as_sf(buildings_spdf)
-  message('✔ DONE')
-  
-  cat('Converting buildings coordinate system to match LiDAR... ')
-  buildings = sf::st_transform(buildings_sf, las_crs)
-  buildings = dplyr::rename(buildings, bldgTopElev = dplyr::all_of(buildings_attr_top_elev))
-  message('✔ DONE')
-  
-  cat('Recaclulating building tops... ')
-  buildings$bldgTopElev = buildings$bldgTopElev + above_building_buffer
-  message('✔ DONE')
-  
-  #=======================================================================#
-  # Perform spacial merge between LiDAR and buildings
-  #=======================================================================#
-  cat('Performing spatial merge with building polygons... ')
-  las_with_buildings_markers = lidR::merge_spatial(las, buildings, 'inBuildingPolygon')
-  las_with_buildings_markers = lidR::merge_spatial(las_with_buildings_markers, buildings, 'bldgTopElev')
-  message('✔ DONE')
-  
-  #=======================================================================#
-  # Filter buildings out of the LiDAR
-  #=======================================================================#
-  cat('Filtering buildings out of LiDAR... ')
-  filtered_las = lidR::filter_poi(las_with_buildings_markers, is.na(bldgTopElev) | Z > bldgTopElev) # nolint
-  message('✔ DONE')
-  
-  #=======================================================================#
-  # Return the filtered LiDAR
-  #=======================================================================#
-  message('✅ DONE')
-  return(filtered_las)
+    cat('Transforming buildings to sf type... ')
+    buildings_sf = sf::st_as_sf(buildings_spdf)
+    message('✔ DONE')
+    
+    cat('Converting buildings coordinate system to match LiDAR... ')
+    buildings = sf::st_transform(buildings_sf, las_crs)
+    buildings = dplyr::rename(buildings, bldgTopElev = dplyr::all_of(buildings_attr_top_elev))
+    message('✔ DONE')
+    
+    cat('Recaclulating building tops... ')
+    buildings$bldgTopElev = buildings$bldgTopElev + above_building_buffer
+    message('✔ DONE')
+    
+    #=======================================================================#
+    # Perform spacial merge between LiDAR and buildings
+    #=======================================================================#
+    cat('Performing spatial merge with building polygons... ')
+    las_with_buildings_markers = lidR::merge_spatial(las, buildings, 'inBuildingPolygon')
+    las_with_buildings_markers = lidR::merge_spatial(las_with_buildings_markers, buildings, 'bldgTopElev')
+    message('✔ DONE')
+    
+    #=======================================================================#
+    # Filter buildings out of the LiDAR
+    #=======================================================================#
+    cat('Filtering buildings out of LiDAR... ')
+    filtered_las = lidR::filter_poi(las_with_buildings_markers, is.na(bldgTopElev) | Z > bldgTopElev) # nolint
+    message('✔ DONE')
+
+    #=======================================================================#
+    # Return the filtered LiDAR
+    #=======================================================================#
+    message('✅ DONE')
+    return(filtered_las)
+  }, error = function(error) {
+    #=======================================================================#
+    # Return the original LiDAR (something went wrong)
+    #=======================================================================#
+    message('Something went wrong. Returning the original LiDAR... ')
+    message('✅ DONE')
+    return(las)
+  })
+
+  return(out)
 }
 
 #' Clip LiDAR points to a vegetation shapefile.
